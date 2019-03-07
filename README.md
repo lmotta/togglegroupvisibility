@@ -6,7 +6,8 @@
 
 # Toggle Group Visibility
 
-Plugin for change the visibility of each item in a group.
+This plugin change the visible item(group or layer) of a group(mutually exclusive),
+that can be done manually or automatically, by buttons or shortcuts of keyboard.
 
 ## Author
 Luiz Motta

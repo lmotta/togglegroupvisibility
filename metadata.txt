@@ -1,7 +1,9 @@
 [general]
 name:Toggle Group Visibility
-description:Plugin for change the visibility of each item in a group.
-about:This plugin change the visible item(group or layer) of group(mutually exclusive)
+description:Plugin for change the visibility of each item in a group by automatically or manually.
+about: This plugin change the visible item(group or layer) of a group(mutually exclusive),
+that can be done manually or automatically, by buttons or shortcuts of keyboard.
+With the plugin can copy a item from group to another group and set the current visible item in layer painel.
   This plugin is developed on the demand of IBAMA(Brazilian Institute of Environment and Renewable Natural Resources)
   http://www.ibama.gov.br
 
