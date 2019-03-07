@@ -7,7 +7,7 @@ With the plugin can copy a item from group to another group and set the current 
   This plugin is developed on the demand of IBAMA(Brazilian Institute of Environment and Renewable Natural Resources)
   http://www.ibama.gov.br
 
-version:0.1
+version:0.11
 qgisMinimumVersion:3.4
 
 author:Luiz Motta
@@ -26,5 +26,7 @@ icon:togglegroupvisibility.svg
 experimental:True
 deprecated:False
 
-changelog:0.1(2019-03-11)
+changelog:0.11(2019-03-07)
+  Update metadata
+  - 0.1(2019-03-06)
   Start of plugin
