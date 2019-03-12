@@ -6,3 +6,4 @@
 # Ignore
 !create_zip_plugin.sh
 # Diretory ./i18n NEED .gitignore!
+# Diretory ./doc NEED .gitignore!
