@@ -41,7 +41,7 @@ from qgis.PyQt.QtGui import QIcon, QFont, QCursor
 
 from qgis.core import (
     QgsApplication, QgsProject, Qgis,
-    QgsLayerTreeModel, QgsLayerTreeNode,
+    QgsLayerTreeNode,
     QgsTask
 )
 
