@@ -13,6 +13,8 @@ that can be done manually or automatically, by buttons or shortcuts of keyboard.
 Luiz Motta
 
 ## Changelog
+- 2020-02-17
+Change action of button Select Group(set by active group)
 -2019-03-07
 Update metadata
 -2019-03-06

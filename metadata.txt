@@ -7,7 +7,7 @@ about:
   With the plugin can copy a item from group to another group and set the current visible item in layer painel.
   This plugin is developed on the demand of IBAMA(Brazilian Institute of Environment and Renewable Natural Resources)http://www.ibama.gov.br
 
-version:0.11
+version:0.2
 qgisMinimumVersion:3.4
 
 author:Luiz Motta
@@ -23,10 +23,12 @@ repository:https://github.com/lmotta/togglegroupvisibility
 
 icon:togglegroupvisibility.svg
 
-experimental:True
+experimental:False
 deprecated:False
 
-changelog:0.11(2019-03-07)
+changelog:0.2(2020-02-17)
+  Change action of button Select Group(set by active group)
+  - 0.11(2019-03-07)
   Update metadata
   - 0.1(2019-03-06)
   Start of plugin

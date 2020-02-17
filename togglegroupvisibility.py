@@ -158,15 +158,14 @@ class ToggleGroupVisibility(QObject):
             Qt.Key_C: self.copyCurrentVisible
         }
         self.enableShortcuts = self.dockWidget.ckEnableShortcuts.checkState() == Qt.Checked
-        self.isSelectGroup = False
+        self.ltv = iface.layerTreeView()
         self.hasConnect = None
         self._connect()
         #
         self.msgBar = iface.messageBar()
-        self.ltv = iface.layerTreeView()
         self.modelRoot = self.ltv.layerTreeModel()
         self.root = QgsProject.instance().layerTreeRoot()
-        self.group, self.modelGroup, self.visibleRow = None, None, None # Set in currentChanged.setGroup
+        self.group, self.modelGroup, self.visibleRow = None, None, None # setSelectGroup
         self.groupCopied = None # copyCurrentVisible
         # Task
         # Use connections: mapCanvasRefreshed, changeVisibility
@@ -183,9 +182,9 @@ class ToggleGroupVisibility(QObject):
             { 'signal': self.changeVisibility, 'slot': self.changeVisibilityItem },
             { 'signal': self.mapCanvas.mapCanvasRefreshed, 'slot': self.mapCanvasRefreshed },
             { 'signal': self.mapCanvas.keyReleased, 'slot': self.keyReleased },
-            { 'signal': self.mapCanvas.mapToolSet, 'slot': self.mapToolSet },
             { 'signal': self.dockWidget.keyReleased, 'slot': self.keyReleased },
-            { 'signal': self.dockWidget.btnSelectGroup.clicked, 'slot': self.startSelectGroup },
+            { 'signal': self.ltv.selectionModel().currentChanged, 'slot': self.currentChanged },
+            { 'signal': self.dockWidget.btnSelectGroup.clicked, 'slot': self.setSelectGroup },
             { 'signal': self.dockWidget.btnUp.clicked, 'slot': self.bottom2TopVisibilityItem },
             { 'signal': self.dockWidget.btnDown.clicked, 'slot': self.top2BottomVisibilityItem },
             { 'signal': self.dockWidget.btnLoop.clicked, 'slot': self.loopVisibilityItem },
@@ -265,64 +264,40 @@ class ToggleGroupVisibility(QObject):
         if key in self.shortcuts:
             self.shortcuts[ key ]()
 
-    @pyqtSlot('QgsMapTool*', 'QgsMapTool*')
-    def mapToolSet(self, newTool, oldTool):
-        if not self.isSelectGroup:
-            return
-        QApplication.restoreOverrideCursor()
-        if not newTool == oldTool:
-            self.mapCanvas.setMapTool( newTool, True )
-        self.isSelectGroup = False
-        self.dockWidget.btnSelectGroup.setEnabled( True )
-
-    @pyqtSlot()
-    def startSelectGroup(self):
-        def overrideCursor(shape):
-            cursor = QApplication.overrideCursor()
-            if cursor is None or cursor == 0 or cursor.shape() != shape:
-                QApplication.setOverrideCursor( QCursor( shape ) )
-            elif cursor.shape() != shape:
-                QApplication.setOverrideCursor( QCursor( shape ) )
-
-        if len( self.root.findGroups() ) == 0:
-            msg = QCoreApplication.translate('ToggleGroupVisibility', 'None group in legend!')
-            self.msgBar.pushMessage( self.nameModulus, msg, Qgis.Warning )
-            return
-        self.ltv.selectionModel().currentChanged.connect( self.currentChanged )
-        overrideCursor( Qt.PointingHandCursor )
-        self.dockWidget.btnSelectGroup.setEnabled( False )
-        self.isSelectGroup = True
-        
     @pyqtSlot('QModelIndex', 'QModelIndex')
     def currentChanged(self, current, previus):
-        def setGroup():
-            if not self.group is None:
-                self.group.destroyed.disconnect( self.destroyedGroup )
-                self.group.visibilityChanged.disconnect( self.visibilityChangedGroup )
-            
-            self.group = node
-            self.group.setIsMutuallyExclusive( True )
-            self.group.setItemVisibilityChecked( True)
-            self.dockWidget.lblGroup.setText( self.group.name() )
-            self.modelGroup = current.model()
-            self.visibleRow = 0
-            self.dockWidget.btnSelectGroup.setEnabled( True )
-            nodeChild = node.children()[ self.visibleRow ]
-            nodeChild.setItemVisibilityChecked( True )
-            self.dockWidget.gbxItem.setTitle( nodeChild.name() )
-            self.group.destroyed.connect( self.destroyedGroup )
-            self.group.visibilityChanged.connect( self.visibilityChangedGroup )
-            self.isSelectGroup = False
-
         node = self.modelRoot.index2node( current )
         if not node.nodeType() == QgsLayerTreeNode.NodeGroup:
+            self.dockWidget.btnSelectGroup.setEnabled( False )
             return
-        if len( node.children() ) == 0:
-            return
-        self.ltv.selectionModel().currentChanged.disconnect( self.currentChanged )
-        QApplication.restoreOverrideCursor()
-        setGroup()
+        totalLayers = len( node.findLayers() )
+        enabled = True if totalLayers > 0 else False
+        self.dockWidget.btnSelectGroup.setEnabled( enabled )
+        self.dockWidget.btnSelectGroup.setToolTip( f"{node.name()} ({totalLayers} layers)")
 
+    @pyqtSlot()
+    def setSelectGroup(self):
+        if not self.group is None:
+            self.group.destroyed.disconnect( self.destroyedGroup )
+            self.group.visibilityChanged.disconnect( self.visibilityChangedGroup )
+        
+        node  = self.ltv.currentNode()
+        node.setIsMutuallyExclusive( True )
+        node.setItemVisibilityChecked( True)
+        node.destroyed.connect( self.destroyedGroup )
+        node.visibilityChanged.connect( self.visibilityChangedGroup )
+
+        self.dockWidget.lblGroup.setText( node.name() )
+
+        self.modelGroup = self.modelRoot.node2index( node ).model()
+
+        self.visibleRow = 0
+        nodeChild = node.children()[ self.visibleRow ]
+        nodeChild.setItemVisibilityChecked( True )
+        self.dockWidget.gbxItem.setTitle( nodeChild.name() )
+
+        self.group = node
+        
     @pyqtSlot()
     def top2BottomVisibilityItem(self):
         if self.group is None:
