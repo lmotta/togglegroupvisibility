@@ -13,8 +13,9 @@
 <img src="doc/add_panel_menu.png" width="300" height="400"/>
 <img src="doc/add_panel_icon.png"/>
   * Select a group.  
-<img src="doc/select_group_panel.png" width="150" height="200"/>
-<img src="doc/select_group_layer_panel.png" width="150" height="200"/>
+  \* The select group is the current group  in layers panel.  
+<img src="doc/select_group_panel.png" width="150" height="250"/>
+
 
 * **Plugin Panel:**  
   * Up: Change visibility to the above item(shortcut '<').
