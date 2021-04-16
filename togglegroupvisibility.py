@@ -266,10 +266,12 @@ class ToggleGroupVisibility(QObject):
 
     @pyqtSlot('QModelIndex', 'QModelIndex')
     def currentChanged(self, current, previus):
-        node = self.modelRoot.index2node( current )
-        if not node.nodeType() == QgsLayerTreeNode.NodeGroup:
+        # self.modelRoot.currentIndex().row() == -1: a Group
+        if not self.modelRoot.currentIndex().row() == -1:
             self.dockWidget.btnSelectGroup.setEnabled( False )
             return
+
+        node = self.modelRoot.index2node( current )
         totalLayers = len( node.findLayers() )
         enabled = True if totalLayers > 0 else False
         self.dockWidget.btnSelectGroup.setEnabled( enabled )
@@ -277,7 +279,7 @@ class ToggleGroupVisibility(QObject):
 
     @pyqtSlot()
     def setSelectGroup(self):
-        if not self.group is None:
+        if self.group:
             self.group.destroyed.disconnect( self.destroyedGroup )
             self.group.visibilityChanged.disconnect( self.visibilityChangedGroup )
         
