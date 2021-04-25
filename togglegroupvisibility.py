@@ -24,26 +24,26 @@ __copyright__ = '(C) 2019, Luiz Motta'
 __revision__ = '$Format:%H$'
 
 from enum import Enum
+from time import sleep
 
 from qgis.PyQt.QtCore import (
   QCoreApplication, Qt,
-  QVariant, QObject,
+  QObject,
   pyqtSlot, pyqtSignal
 )
 from qgis.PyQt.QtWidgets import (
-  QApplication,
   QWidget, QDockWidget,
   QLayout, QGridLayout, QGroupBox, QHBoxLayout, 
-  QLabel, QSizePolicy, QPushButton,
-  QRadioButton, QCheckBox, QSpinBox
+  QLabel, QPushButton,
+  QRadioButton, QCheckBox, QSpinBox,
 )
 from qgis.PyQt.QtGui import QIcon, QFont, QCursor
 
 from qgis.core import (
-    QgsApplication, QgsProject, Qgis,
-    QgsLayerTreeNode,
+    QgsApplication, QgsProject,
     QgsTask
 )
+import qgis.utils as QgsUtils
 
 
 class DockWidgetToggleGroupVisibility(QDockWidget):
@@ -81,6 +81,7 @@ class DockWidgetToggleGroupVisibility(QDockWidget):
             # Group
             msg = QCoreApplication.translate('ToggleGroupVisibility', 'Select Group')
             self.btnSelectGroup = QPushButton( msg, wgt )
+            self.btnSelectGroup.setEnabled( False )
             self.lblGroup = QLabel('', wgt )
             # Visible Item
             msg = QCoreApplication.translate('ToggleGroupVisibility', 'Up [<]')
@@ -122,7 +123,7 @@ class DockWidgetToggleGroupVisibility(QDockWidget):
                 { 'widget': self.gbxItem,             'row': 2, 'col': 0 }
             ]
             lyt = getLayout( wgt, l_wts )
-            lyt.setSizeConstraint( QLayout.SetMaximumSize )
+            lyt.setSizeConstraint( QLayout.SetFixedSize )
             wgt.setLayout( lyt )
             self.setWidget( wgt )
 
@@ -158,13 +159,12 @@ class ToggleGroupVisibility(QObject):
             Qt.Key_C: self.copyCurrentVisible
         }
         self.enableShortcuts = self.dockWidget.ckEnableShortcuts.checkState() == Qt.Checked
-        self.ltv = iface.layerTreeView()
+        self.ltView = iface.layerTreeView()
+        self.modelRoot = self.ltView.layerTreeModel()
+        #
         self.hasConnect = None
         self._connect()
         #
-        self.msgBar = iface.messageBar()
-        self.modelRoot = self.ltv.layerTreeModel()
-        self.root = QgsProject.instance().layerTreeRoot()
         self.group, self.modelGroup, self.visibleRow = None, None, None # setSelectGroup
         self.groupCopied = None # copyCurrentVisible
         # Task
@@ -183,7 +183,7 @@ class ToggleGroupVisibility(QObject):
             { 'signal': self.mapCanvas.mapCanvasRefreshed, 'slot': self.mapCanvasRefreshed },
             { 'signal': self.mapCanvas.keyReleased, 'slot': self.keyReleased },
             { 'signal': self.dockWidget.keyReleased, 'slot': self.keyReleased },
-            { 'signal': self.ltv.selectionModel().currentChanged, 'slot': self.currentChanged },
+            { 'signal': self.ltView.selectionModel().currentChanged, 'slot': self.currentChanged },
             { 'signal': self.dockWidget.btnSelectGroup.clicked, 'slot': self.setSelectGroup },
             { 'signal': self.dockWidget.btnUp.clicked, 'slot': self.bottom2TopVisibilityItem },
             { 'signal': self.dockWidget.btnDown.clicked, 'slot': self.top2BottomVisibilityItem },
@@ -209,24 +209,27 @@ class ToggleGroupVisibility(QObject):
                 break
         return visibleNode
 
-    def runTask(self, data):
+    def runTaskLoop(self, time, children, direction):
         def finished(exception, dataResult):
             pass
 
-        def run(task, d):
+        def run(task, time, children, direction):
             self.refreshed = True
             while(1):
                 if task.isCanceled():
                     return False
                 if self.refreshed:
                     self.refreshed = False
-                    self.changeVisibility.emit( d['children'], d['direction'] )
-                    task.waitForFinished( d['time'] * 1000 )
+                    self.changeVisibility.emit( children, direction )
+                    sleep( time )
         
-        task = QgsTask.fromFunction('ToggleGroupVisibility Task', run, data, on_finished=finished )
+        task = QgsTask.fromFunction('ToggleGroupVisibility Task', run, time, children, direction, on_finished=finished )
         layers = [ ltl.layer() for ltl in self.group.findLayers() ]
         task.setDependentLayers( layers )
         self.taskId = self.taskManager.addTask( task )
+        # Debug
+        # r = run( task, time, children, direction )
+        # finished( None, r)
 
     def cancelTask(self):
         if self.taskId is None:
@@ -251,8 +254,8 @@ class ToggleGroupVisibility(QObject):
             return
         node = children[ self.visibleRow ]
         node.setItemVisibilityChecked( True )
-
-    @pyqtSlot() # runTask
+    
+    @pyqtSlot() # Runnig Task Loop
     def mapCanvasRefreshed(self):
         self.refreshed = True
 
@@ -266,12 +269,11 @@ class ToggleGroupVisibility(QObject):
 
     @pyqtSlot('QModelIndex', 'QModelIndex')
     def currentChanged(self, current, previus):
-        # self.modelRoot.currentIndex().row() == -1: a Group
-        if not self.modelRoot.currentIndex().row() == -1:
+        node = self.ltView.currentNode()
+        if not node or not node.nodeType() == node.NodeGroup:
             self.dockWidget.btnSelectGroup.setEnabled( False )
             return
 
-        node = self.modelRoot.index2node( current )
         totalLayers = len( node.findLayers() )
         enabled = True if totalLayers > 0 else False
         self.dockWidget.btnSelectGroup.setEnabled( enabled )
@@ -283,7 +285,7 @@ class ToggleGroupVisibility(QObject):
             self.group.destroyed.disconnect( self.destroyedGroup )
             self.group.visibilityChanged.disconnect( self.visibilityChangedGroup )
         
-        node  = self.ltv.currentNode()
+        node  = self.ltView.currentNode()
         node.setIsMutuallyExclusive( True )
         node.setItemVisibilityChecked( True)
         node.destroyed.connect( self.destroyedGroup )
@@ -329,7 +331,7 @@ class ToggleGroupVisibility(QObject):
             'children': children,
             'direction': direction
         }
-        self.runTask( data )
+        self.runTaskLoop( **data )
 
     @pyqtSlot()
     def setCurrentVisibility(self):
@@ -338,7 +340,7 @@ class ToggleGroupVisibility(QObject):
         visibleNode = self.getVisibleNode()
         if visibleNode is None:
             return
-        self.ltv.setCurrentIndex( self.modelRoot.node2index( visibleNode ) )
+        self.ltView.setCurrentIndex( self.modelRoot.node2index( visibleNode ) )
 
     @pyqtSlot()
     def copyCurrentVisible(self):
