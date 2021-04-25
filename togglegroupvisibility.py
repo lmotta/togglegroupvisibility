@@ -33,9 +33,11 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtWidgets import (
   QWidget, QDockWidget,
-  QLayout, QGridLayout, QGroupBox, QHBoxLayout, 
+  QLayout, QHBoxLayout, QVBoxLayout,
+  QGroupBox,
   QLabel, QPushButton,
   QRadioButton, QCheckBox, QSpinBox,
+  QSpacerItem, QSizePolicy
 )
 from qgis.PyQt.QtGui import QIcon, QFont, QCursor
 
@@ -50,82 +52,103 @@ class DockWidgetToggleGroupVisibility(QDockWidget):
     keyReleased = pyqtSignal('QKeyEvent*')
     def __init__(self, iface):
         def setupUi():
-            def getLayout(parent, widgets):
-                lyt = QGridLayout( parent )
-                for item in widgets:
-                    funcAdd = lyt.addWidget if isinstance( item['widget'], QWidget) else lyt.addLayout
-                    if 'spam' in item:
-                        sRow, sCol = item['spam']['row'], item['spam']['col']
-                        funcAdd( item['widget'], item['row'], item['col'], sRow, sCol, Qt.AlignLeft )
-                    else:
-                        funcAdd( item['widget'], item['row'], item['col'], Qt.AlignLeft )
+            def groupLayout(parent):
+                lyt = QVBoxLayout()
+                msg = QCoreApplication.translate('ToggleGroupVisibility', 'Select Group')
+                w = QPushButton( msg, parent )
+                self.__dict__['btn_group'] = w
+                w.setEnabled( False )
+                lyt.addWidget( w )
+                w =  QLabel('', parent )
+                self.__dict__['lbl_group'] = w
+                lyt.addWidget( w )
+                s = QSpacerItem( 10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum )
+                lyt.addItem( s )
                 return lyt
 
-            def getGroupBox(name, parent, widgets):
-                lyt = getLayout( parent, widgets )
-                gbx = QGroupBox(name, parent )
-                gbx.setLayout( lyt )
-                return gbx
+            def navigationGroup(parent):
+                def getSpinTime(parent, value):
+                    sp = QSpinBox( parent )
+                    sp.setRange(1, 50)
+                    sp.setSingleStep(1)
+                    sp.setSuffix(' second')
+                    sp.setValue(value)
+                    return sp
 
-            def getSpinTime(wgt, value):
-                sp = QSpinBox( wgt)
-                sp.setRange(1, 50)
-                sp.setSingleStep(1)
-                sp.setSuffix(' second')
-                sp.setValue(value)
-                return sp
+                lytGroup = QVBoxLayout()
+                # Upper & Down
+                lyt = QHBoxLayout()
+                msg = QCoreApplication.translate('ToggleGroupVisibility', '[<] Upper')
+                w = QPushButton( msg, parent )
+                self.__dict__['btn_upper'] = w
+                lyt.addWidget( w )
+                msg = QCoreApplication.translate('ToggleGroupVisibility', '[>] Down')
+                w = QPushButton( msg, parent )
+                self.__dict__['btn_down'] = w
+                lyt.addWidget( w )
+                lytGroup.addLayout( lyt )
+                # Loop & second
+                lyt = QHBoxLayout()
+                msg = QCoreApplication.translate('ToggleGroupVisibility', '[L]oop')
+                w = QPushButton( msg, parent )
+                self.__dict__['btn_loop'] = w
+                lyt.addWidget( w )
+                w = getSpinTime( parent, 1)
+                self.__dict__['sb_time'] = w
+                lyt.addWidget( w )
+                lytGroup.addLayout( lyt )
+                # Check box Upper  & Down
+                lyt = QHBoxLayout()
+                s = QSpacerItem( 10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum )
+                lyt.addItem( s )
+                msg = QCoreApplication.translate('ToggleGroupVisibility', 'Upper')
+                w =  QRadioButton( msg, parent )
+                lyt.addWidget( w )
+                msg = QCoreApplication.translate('ToggleGroupVisibility', 'Down')
+                w =  QRadioButton( msg, parent )
+                self.__dict__['rb_down'] = w
+                w.setChecked( True )
+                lyt.addWidget( w )
+                lytGroup.addLayout( lyt )
+                # Set current and Copy
+                lyt = QHBoxLayout()
+                msg = QCoreApplication.translate('ToggleGroupVisibility', '[?] Set current')
+                w = QPushButton( msg, parent )
+                self.__dict__['btn_current'] = w
+                lyt.addWidget( w )
+                msg = QCoreApplication.translate('ToggleGroupVisibility', '[C]opy')
+                w = QPushButton( msg, parent )
+                self.__dict__['btn_copy'] = w
+                lyt.addWidget( w )
+                lytGroup.addLayout( lyt )
+                # Enable
+                lyt = QHBoxLayout()
+                msg = QCoreApplication.translate('ToggleGroupVisibility', 'Enable shortcuts')
+                w = QCheckBox( msg, parent )
+                self.__dict__['ck_enabled'] = w
+                lyt.addWidget( w )
+                s = QSpacerItem( 10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum )
+                lyt.addItem( s )
+                lytGroup.addLayout( lyt )
+                #              
+                w = QGroupBox('', parent )
+                w.setLayout( lytGroup )
+                return w
 
             self.setObjectName('togglegroupvisibility_dockwidget')
-            wgt = QWidget( self )
-            wgt.setAttribute(Qt.WA_DeleteOnClose)
-            # Group
-            msg = QCoreApplication.translate('ToggleGroupVisibility', 'Select Group')
-            self.btnSelectGroup = QPushButton( msg, wgt )
-            self.btnSelectGroup.setEnabled( False )
-            self.lblGroup = QLabel('', wgt )
-            # Visible Item
-            msg = QCoreApplication.translate('ToggleGroupVisibility', 'Up [<]')
-            self.btnUp = QPushButton( msg, wgt )
-            msg = QCoreApplication.translate('ToggleGroupVisibility', 'Down [>]')
-            self.btnDown = QPushButton( msg, wgt )
-            msg = QCoreApplication.translate('ToggleGroupVisibility', 'Loop [L]')
-            self.btnLoop = QPushButton( msg, wgt )
-            lytRadioButton = QHBoxLayout()
-            msg = QCoreApplication.translate('ToggleGroupVisibility', 'Up')
-            rbUp = QRadioButton( msg, wgt )
-            lytRadioButton.addWidget( rbUp )
-            msg = QCoreApplication.translate('ToggleGroupVisibility', 'Down')
-            self.rbDown = QRadioButton( msg, wgt )
-            self.rbDown.setChecked(True)
-            lytRadioButton.addWidget( self.rbDown )
-            self.sbLoopTime = getSpinTime( wgt, 1 )
-            msg = QCoreApplication.translate('ToggleGroupVisibility', 'Set current [?]')
-            self.btnCurrent = QPushButton( msg, wgt )
-            msg = QCoreApplication.translate('ToggleGroupVisibility', 'Copy [C]')
-            self.btnCopy = QPushButton( msg, wgt )
-            msg = QCoreApplication.translate('ToggleGroupVisibility', 'Enable shortcuts')
-            self.ckEnableShortcuts = QCheckBox( msg, wgt )
-            l_wts = [
-                { 'widget': self.btnUp,             'row': 0, 'col': 0 },
-                { 'widget': self.btnDown,           'row': 0, 'col': 1 },
-                { 'widget': self.btnLoop,           'row': 1, 'col': 0 },
-                { 'widget': self.sbLoopTime,        'row': 1, 'col': 1 },
-                { 'widget': lytRadioButton,         'row': 2, 'col': 1 },
-                { 'widget': self.btnCurrent,        'row': 3, 'col': 0 },
-                { 'widget': self.btnCopy,           'row': 3, 'col': 1 },
-                { 'widget': self.ckEnableShortcuts, 'row': 4, 'col': 0 }
-            ]
-            self.gbxItem = getGroupBox( '', wgt, l_wts)
+            wgtMain = QWidget( self )
+            wgtMain.setAttribute(Qt.WA_DeleteOnClose)
+            lytMain = QVBoxLayout()
             #
-            l_wts = [
-                { 'widget': self.btnSelectGroup, 'row': 0, 'col': 0 },
-                { 'widget': self.lblGroup,       'row': 1, 'col': 0 },
-                { 'widget': self.gbxItem,             'row': 2, 'col': 0 }
-            ]
-            lyt = getLayout( wgt, l_wts )
-            lyt.setSizeConstraint( QLayout.SetFixedSize )
-            wgt.setLayout( lyt )
-            self.setWidget( wgt )
+            lytMain.addLayout( groupLayout( wgtMain ) )
+            self.gbx_navigation = navigationGroup( wgtMain )
+            lytMain.addWidget( self.gbx_navigation )
+            #
+            s = QSpacerItem( 10, 10, QSizePolicy.Minimum, QSizePolicy.Expanding )
+            lytMain.addItem( s )
+            #
+            wgtMain.setLayout( lytMain )
+            self.setWidget( wgtMain )
 
         super().__init__('Toggle Group Visibility', iface.mainWindow() )
         setupUi()
@@ -158,9 +181,10 @@ class ToggleGroupVisibility(QObject):
             Qt.Key_Question: self.setCurrentVisibility,
             Qt.Key_C: self.copyCurrentVisible
         }
-        self.enableShortcuts = self.dockWidget.ckEnableShortcuts.checkState() == Qt.Checked
+        self.enableShortcuts = self.dockWidget.ck_enabled.checkState() == Qt.Checked
         self.ltView = iface.layerTreeView()
         self.modelRoot = self.ltView.layerTreeModel()
+        self.ltRoot = QgsProject.instance().layerTreeRoot()
         #
         self.hasConnect = None
         self._connect()
@@ -184,13 +208,13 @@ class ToggleGroupVisibility(QObject):
             { 'signal': self.mapCanvas.keyReleased, 'slot': self.keyReleased },
             { 'signal': self.dockWidget.keyReleased, 'slot': self.keyReleased },
             { 'signal': self.ltView.selectionModel().currentChanged, 'slot': self.currentChanged },
-            { 'signal': self.dockWidget.btnSelectGroup.clicked, 'slot': self.setSelectGroup },
-            { 'signal': self.dockWidget.btnUp.clicked, 'slot': self.bottom2TopVisibilityItem },
-            { 'signal': self.dockWidget.btnDown.clicked, 'slot': self.top2BottomVisibilityItem },
-            { 'signal': self.dockWidget.btnLoop.clicked, 'slot': self.loopVisibilityItem },
-            { 'signal': self.dockWidget.btnCurrent.clicked, 'slot': self.setCurrentVisibility },
-            { 'signal': self.dockWidget.btnCopy.clicked, 'slot': self.copyCurrentVisible },
-            { 'signal': self.dockWidget.ckEnableShortcuts.clicked, 'slot': self.ckenableShortcuts }
+            { 'signal': self.dockWidget.btn_group.clicked, 'slot': self.setSelectGroup },
+            { 'signal': self.dockWidget.btn_upper.clicked, 'slot': self.bottom2TopVisibilityItem },
+            { 'signal': self.dockWidget.btn_down.clicked, 'slot': self.top2BottomVisibilityItem },
+            { 'signal': self.dockWidget.btn_loop.clicked, 'slot': self.loopVisibilityItem },
+            { 'signal': self.dockWidget.btn_current.clicked, 'slot': self.setCurrentVisibility },
+            { 'signal': self.dockWidget.btn_copy.clicked, 'slot': self.copyCurrentVisible },
+            { 'signal': self.dockWidget.ck_enabled.clicked, 'slot': self.checkEnabled }
         ]
         if isConnect:
             self.hasConnect = True
@@ -271,13 +295,13 @@ class ToggleGroupVisibility(QObject):
     def currentChanged(self, current, previus):
         node = self.ltView.currentNode()
         if not node or not node.nodeType() == node.NodeGroup:
-            self.dockWidget.btnSelectGroup.setEnabled( False )
+            self.dockWidget.btn_group.setEnabled( False )
             return
 
         totalLayers = len( node.findLayers() )
         enabled = True if totalLayers > 0 else False
-        self.dockWidget.btnSelectGroup.setEnabled( enabled )
-        self.dockWidget.btnSelectGroup.setToolTip( f"{node.name()} ({totalLayers} layers)")
+        self.dockWidget.btn_group.setEnabled( enabled )
+        self.dockWidget.btn_group.setToolTip( f"{node.name()} ({totalLayers} layers)")
 
     @pyqtSlot()
     def setSelectGroup(self):
@@ -291,14 +315,14 @@ class ToggleGroupVisibility(QObject):
         node.destroyed.connect( self.destroyedGroup )
         node.visibilityChanged.connect( self.visibilityChangedGroup )
 
-        self.dockWidget.lblGroup.setText( node.name() )
+        self.dockWidget.lbl_group.setText( node.name() )
 
         self.modelGroup = self.modelRoot.node2index( node ).model()
 
         self.visibleRow = 0
         nodeChild = node.children()[ self.visibleRow ]
         nodeChild.setItemVisibilityChecked( True )
-        self.dockWidget.gbxItem.setTitle( nodeChild.name() )
+        self.dockWidget.gbx_navigation.setTitle( nodeChild.name() )
 
         self.group = node
         
@@ -324,10 +348,10 @@ class ToggleGroupVisibility(QObject):
             return
         children = self.group.children()
         direction = DirectionVisibilityChange.TOP2BOTTOM \
-            if self.dockWidget.rbDown.isChecked() \
+            if self.dockWidget.rb_down.isChecked() \
             else DirectionVisibilityChange.BOTTOM2TOP
         data = {
-            'time': self.dockWidget.sbLoopTime.value(),
+            'time': self.dockWidget.sb_time.value(),
             'children': children,
             'direction': direction
         }
@@ -350,29 +374,29 @@ class ToggleGroupVisibility(QObject):
         if visibleNode is None:
             return
         if self.groupCopied is None:
-            self.groupCopied = self.root.insertGroup(0, 'GroupVisibility')
+            self.groupCopied = self.ltRoot.insertGroup(0, 'GroupVisibility')
             self.groupCopied.setIsMutuallyExclusive( True )
             self.groupCopied.setItemVisibilityChecked(False)
             self.groupCopied.destroyed.connect( self.destroyedGroupCopied)
         self.groupCopied.addChildNode( visibleNode.clone() )
 
     @pyqtSlot()
-    def ckenableShortcuts(self):
-        self.enableShortcuts = self.dockWidget.ckEnableShortcuts.checkState() == Qt.Checked
+    def checkEnabled(self):
+        self.enableShortcuts = self.dockWidget.ck_enabled.checkState() == Qt.Checked
 
     @pyqtSlot('QObject*')
     def destroyedGroup(self, obj):
         if self.group is None:
             return
         self.group = None
-        self.dockWidget.lblGroup.setText('')
-        self.dockWidget.gbxItem.setTitle('')
+        self.dockWidget.lbl_group.setText('')
+        self.dockWidget.gbx_navigation.setTitle('')
         self.cancelTask()
 
     @pyqtSlot('QgsLayerTreeNode*')
     def visibilityChangedGroup(self, node):
         if node.itemVisibilityChecked():
-            self.dockWidget.gbxItem.setTitle( node.name() )
+            self.dockWidget.gbx_navigation.setTitle( node.name() )
             self.visibleRow = self.modelGroup.node2index( node ).row()
 
     @pyqtSlot('QObject*')
