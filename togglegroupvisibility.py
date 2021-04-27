@@ -35,7 +35,7 @@ from qgis.PyQt.QtWidgets import (
   QWidget, QDockWidget,
   QLayout, QHBoxLayout, QVBoxLayout,
   QGroupBox,
-  QLabel, QPushButton,
+  QLabel, QLineEdit, QPushButton,
   QRadioButton, QCheckBox, QSpinBox,
   QSpacerItem, QSizePolicy
 )
@@ -78,11 +78,11 @@ class DockWidgetToggleGroupVisibility(QDockWidget):
                 lytGroup = QVBoxLayout()
                 # Upper & Down
                 lyt = QHBoxLayout()
-                msg = QCoreApplication.translate('ToggleGroupVisibility', '[<] Upper')
+                msg = QCoreApplication.translate('ToggleGroupVisibility', u'\u2191'+ ' Upper')
                 w = QPushButton( msg, parent )
                 self.__dict__['btn_upper'] = w
                 lyt.addWidget( w )
-                msg = QCoreApplication.translate('ToggleGroupVisibility', '[>] Down')
+                msg = QCoreApplication.translate('ToggleGroupVisibility', u'\u2193'+ ' Down')
                 w = QPushButton( msg, parent )
                 self.__dict__['btn_down'] = w
                 lyt.addWidget( w )
@@ -99,8 +99,12 @@ class DockWidgetToggleGroupVisibility(QDockWidget):
                 lytGroup.addLayout( lyt )
                 # Check box Upper  & Down
                 lyt = QHBoxLayout()
-                s = QSpacerItem( 10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum )
-                lyt.addItem( s )
+                w = QLineEdit('', parent )
+                w.setToolTip('Put cursor here for use shortcuts')
+                _color = 224
+                _rgb = f"rgb({_color}, {_color},{_color})"
+                w.setStyleSheet('QLineEdit { background : _rgb; color: _rgb; }'.replace('_rgb', _rgb))
+                lyt.addWidget( w )
                 msg = QCoreApplication.translate('ToggleGroupVisibility', 'Upper')
                 w =  QRadioButton( msg, parent )
                 lyt.addWidget( w )
@@ -123,10 +127,6 @@ class DockWidgetToggleGroupVisibility(QDockWidget):
                 lytGroup.addLayout( lyt )
                 # Enable
                 lyt = QHBoxLayout()
-                msg = QCoreApplication.translate('ToggleGroupVisibility', 'Enable shortcuts')
-                w = QCheckBox( msg, parent )
-                self.__dict__['ck_enabled'] = w
-                lyt.addWidget( w )
                 s = QSpacerItem( 10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum )
                 lyt.addItem( s )
                 lytGroup.addLayout( lyt )
@@ -175,13 +175,12 @@ class ToggleGroupVisibility(QObject):
         self.mapCanvas = iface.mapCanvas()
         #
         self.shortcuts = {
-            Qt.Key_Greater: self.top2BottomVisibilityItem,
-            Qt.Key_Less: self.bottom2TopVisibilityItem,
+            Qt.Key_Down: self.top2BottomVisibilityItem,
+            Qt.Key_Up: self.bottom2TopVisibilityItem,
             Qt.Key_L: self.loopVisibilityItem,
             Qt.Key_Question: self.setCurrentVisibility,
             Qt.Key_C: self.copyCurrentVisible
         }
-        self.enableShortcuts = self.dockWidget.ck_enabled.checkState() == Qt.Checked
         self.ltView = iface.layerTreeView()
         self.modelRoot = self.ltView.layerTreeModel()
         self.ltRoot = QgsProject.instance().layerTreeRoot()
@@ -205,7 +204,6 @@ class ToggleGroupVisibility(QObject):
         ss = [
             { 'signal': self.changeVisibility, 'slot': self.changeVisibilityItem },
             { 'signal': self.mapCanvas.mapCanvasRefreshed, 'slot': self.mapCanvasRefreshed },
-            { 'signal': self.mapCanvas.keyReleased, 'slot': self.keyReleased },
             { 'signal': self.dockWidget.keyReleased, 'slot': self.keyReleased },
             { 'signal': self.ltView.selectionModel().currentChanged, 'slot': self.currentChanged },
             { 'signal': self.dockWidget.btn_group.clicked, 'slot': self.setSelectGroup },
@@ -214,7 +212,6 @@ class ToggleGroupVisibility(QObject):
             { 'signal': self.dockWidget.btn_loop.clicked, 'slot': self.loopVisibilityItem },
             { 'signal': self.dockWidget.btn_current.clicked, 'slot': self.setCurrentVisibility },
             { 'signal': self.dockWidget.btn_copy.clicked, 'slot': self.copyCurrentVisible },
-            { 'signal': self.dockWidget.ck_enabled.clicked, 'slot': self.checkEnabled }
         ]
         if isConnect:
             self.hasConnect = True
@@ -285,8 +282,6 @@ class ToggleGroupVisibility(QObject):
 
     @pyqtSlot('QKeyEvent*')
     def keyReleased(self, e):
-        if not self.enableShortcuts:
-            return
         key = e.key()
         if key in self.shortcuts:
             self.shortcuts[ key ]()
@@ -379,10 +374,6 @@ class ToggleGroupVisibility(QObject):
             self.groupCopied.setItemVisibilityChecked(False)
             self.groupCopied.destroyed.connect( self.destroyedGroupCopied)
         self.groupCopied.addChildNode( visibleNode.clone() )
-
-    @pyqtSlot()
-    def checkEnabled(self):
-        self.enableShortcuts = self.dockWidget.ck_enabled.checkState() == Qt.Checked
 
     @pyqtSlot('QObject*')
     def destroyedGroup(self, obj):
