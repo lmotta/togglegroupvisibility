@@ -28,7 +28,7 @@ from time import sleep
 
 from qgis.PyQt.QtCore import (
   QCoreApplication, Qt,
-  QObject,
+  QObject, QPointF,
   pyqtSlot, pyqtSignal
 )
 from qgis.PyQt.QtWidgets import (
@@ -39,13 +39,15 @@ from qgis.PyQt.QtWidgets import (
   QRadioButton, QCheckBox, QSpinBox,
   QSpacerItem, QSizePolicy
 )
-from qgis.PyQt.QtGui import QIcon, QFont, QCursor
+from qgis.PyQt.QtGui import QColor, QFont, QTextDocument
 
 from qgis.core import (
     QgsApplication, QgsProject,
+    QgsPointXY,
+    QgsTextAnnotation, QgsMarkerSymbol, QgsFillSymbol,
     QgsTask
 )
-import qgis.utils as QgsUtils
+
 
 
 class DockWidgetToggleGroupVisibility(QDockWidget):
@@ -125,7 +127,12 @@ class DockWidgetToggleGroupVisibility(QDockWidget):
                 self.__dict__['btn_copy'] = w
                 lyt.addWidget( w )
                 lytGroup.addLayout( lyt )
-                # Enable
+                # Enable annotation
+                w = QCheckBox('[E]nable annotation', parent )
+                self.__dict__['ck_annotation'] = w
+                w.setChecked( False )
+                lytGroup.addWidget( w )
+                #
                 lyt = QHBoxLayout()
                 s = QSpacerItem( 10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum )
                 lyt.addItem( s )
@@ -166,20 +173,84 @@ class DirectionVisibilityChange(Enum):
     BOTTOM2TOP = 2
 
 
+class AnnotationCanvas(QObject):
+    def __init__(self, mapCanvas):
+        super().__init__()
+        self.annotationManager = QgsProject.instance().annotationManager()
+        self.mapCanvas = mapCanvas
+        self.annot, self.text = None, None
+
+    def setText(self, text, changeAnnotation=False):
+        if not text:
+            self._remove()
+            self.mapCanvas.extentsChanged.disconnect( self.extentsChanged )
+            return
+        self.text = text
+        if not self.annot or changeAnnotation:
+            if changeAnnotation:
+                self._remove()
+            self.annot = self._createAnnotationCurrentLayer()
+            self.annotationManager.addAnnotation( self.annot )
+            self.mapCanvas.extentsChanged.connect( self.extentsChanged )
+
+    @pyqtSlot()
+    def extentsChanged(self):
+        self._remove()
+        self.annot = self._createAnnotationCurrentLayer()
+        self.annotationManager.addAnnotation( self.annot )
+
+    def _remove(self):
+        if self.annot in self.annotationManager.annotations():
+            self.annotationManager.removeAnnotation( self.annot )
+            self.annot = None
+
+    def _createAnnotationCurrentLayer(self):
+        def setPosition(annotation):
+            e = self.mapCanvas.extent()
+            p = QgsPointXY(e.xMinimum(), e.yMaximum() )
+            annotation.setMapPosition( p )
+
+        def setFrameDocument(annotation):
+            font = QFont()
+            font.setPointSize(20)
+            td = QTextDocument( self.text )
+            td.setDefaultFont( font )
+            annotation.setFrameOffsetFromReferencePointMm(QPointF(0,0))
+            annotation.setFrameSize( td.size() )
+            annotation.setDocument( td )
+
+        def setFillMarker(annotation):
+            annotation.setFillSymbol( QgsFillSymbol.createSimple({'color': 'white', 'outline_color': 'white'}) )
+            marker = QgsMarkerSymbol()
+            marker.setColor(QColor('white'))
+            marker.setOpacity(0)
+            annotation.setMarkerSymbol(  marker )
+
+        annot = QgsTextAnnotation()
+        setPosition( annot )
+
+        setFrameDocument( annot)
+        setFillMarker( annot )
+        return annot
+
+
 class ToggleGroupVisibility(QObject):
     changeVisibility = pyqtSignal(list, DirectionVisibilityChange)
     nameModulus = "ToggleGroupVisibility"
     def __init__(self, iface, dockWidget):
         super().__init__()
+        dockWidget.gbx_navigation.setEnabled( False )
         self.dockWidget = dockWidget
         self.mapCanvas = iface.mapCanvas()
+        self.annotationCanvas = AnnotationCanvas( self.mapCanvas )
         #
         self.shortcuts = {
             Qt.Key_Down: self.top2BottomVisibilityItem,
             Qt.Key_Up: self.bottom2TopVisibilityItem,
             Qt.Key_L: self.loopVisibilityItem,
             Qt.Key_Question: self.setCurrentVisibility,
-            Qt.Key_C: self.copyCurrentVisible
+            Qt.Key_C: self.copyCurrentVisible,
+            Qt.Key_E: self.enabledAnnotation
         }
         self.ltView = iface.layerTreeView()
         self.modelRoot = self.ltView.layerTreeModel()
@@ -212,6 +283,7 @@ class ToggleGroupVisibility(QObject):
             { 'signal': self.dockWidget.btn_loop.clicked, 'slot': self.loopVisibilityItem },
             { 'signal': self.dockWidget.btn_current.clicked, 'slot': self.setCurrentVisibility },
             { 'signal': self.dockWidget.btn_copy.clicked, 'slot': self.copyCurrentVisible },
+            { 'signal': self.dockWidget.ck_annotation.stateChanged, 'slot': self.enabledAnnotation },
         ]
         if isConnect:
             self.hasConnect = True
@@ -318,6 +390,7 @@ class ToggleGroupVisibility(QObject):
         nodeChild = node.children()[ self.visibleRow ]
         nodeChild.setItemVisibilityChecked( True )
         self.dockWidget.gbx_navigation.setTitle( nodeChild.name() )
+        self.dockWidget.gbx_navigation.setEnabled( True )
 
         self.group = node
         
@@ -375,6 +448,23 @@ class ToggleGroupVisibility(QObject):
             self.groupCopied.destroyed.connect( self.destroyedGroupCopied)
         self.groupCopied.addChildNode( visibleNode.clone() )
 
+    @pyqtSlot()
+    @pyqtSlot(int)
+    def enabledAnnotation(self, state=None):
+        if self.group is None:
+            return
+        if state is None: # Shortcut
+            isChecked = not self.dockWidget.ck_annotation.isChecked()
+            self.dockWidget.ck_annotation.stateChanged.disconnect( self.enabledAnnotation )
+            self.dockWidget.ck_annotation.setChecked( isChecked )
+            self.dockWidget.ck_annotation.stateChanged.connect( self.enabledAnnotation )
+        else: # Gui
+            isChecked = state == Qt.Checked
+        if isChecked:
+            self.annotationCanvas.setText( self.dockWidget.gbx_navigation.title() )
+            return
+        self.annotationCanvas.setText(None)
+
     @pyqtSlot('QObject*')
     def destroyedGroup(self, obj):
         if self.group is None:
@@ -387,7 +477,10 @@ class ToggleGroupVisibility(QObject):
     @pyqtSlot('QgsLayerTreeNode*')
     def visibilityChangedGroup(self, node):
         if node.itemVisibilityChecked():
-            self.dockWidget.gbx_navigation.setTitle( node.name() )
+            name = node.name()
+            self.dockWidget.gbx_navigation.setTitle( name )
+            if self.dockWidget.ck_annotation.isChecked():
+                self.annotationCanvas.setText( name, True )
             self.visibleRow = self.modelGroup.node2index( node ).row()
 
     @pyqtSlot('QObject*')
